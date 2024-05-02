@@ -6,6 +6,13 @@ This project performs gene function analysis for comparative genomics studies be
 The genome of the bacterial strains used in this project was downloaded from NCBI GenBank. ATCC BAA-450 is the type-strain and the RE22 is the strain commonly associated with oysters.
 
 Rapid Annotation using Subsystem Technology (RAST) was also used to annotate the bacterial genomes. These annotations include information such as gene functions, locations, and other metadata essential for downstream analysis.
+    Parameters used for RAST:
+    Genetic code:	11
+    Annotation scheme:	RASTtk
+    Preserve gene calls:	no
+    Automatically fix errors:	yes
+    Fix frameshifts:	yes
+    Backfill gaps:	yes
 
 Annotated CSV files were loaded to R studio.
 
