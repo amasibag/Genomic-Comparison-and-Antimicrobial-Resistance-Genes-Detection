@@ -7,12 +7,12 @@ The genome of the bacterial strains used in this project was downloaded from NCB
 
 Rapid Annotation using Subsystem Technology (RAST) was also used to annotate the bacterial genomes. These annotations include information such as gene functions, locations, and other metadata essential for downstream analysis.
     Parameters used for RAST:
-    Genetic code:	11
-    Annotation scheme:	RASTtk
-    Preserve gene calls:	no
-    Automatically fix errors:	yes
-    Fix frameshifts:	yes
-    Backfill gaps:	yes
+    Genetic code:	11,
+    Annotation scheme:	RASTtk,
+    Preserve gene calls:	no,
+    Automatically fix errors:	yes,
+    Fix frameshifts:	yes,
+    Backfill gaps:	yes.
 
 Annotated CSV files were loaded to R studio.
 
