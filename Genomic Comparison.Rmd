@@ -1,0 +1,270 @@
+---
+title: "BIO539 Final Project - Genomic Comparison of *Vibrio corallilyticus* strains"
+author: "Arvie Grace Masibag"
+date: "2024-05-02"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
+
+<style>
+body {
+text-align: justify}
+</style>
+
+### Information About the BIO539 Final Project 
+
+This BIO539 final project performs gene function analysis for comparative genomics studies between two strains of *Vibrio coralliilyticus*, namely RE22 and ATCC BAA-450. *V. coralliilyticus* is a Gram-negative, rod-shaped bacterium, that is known to infect coral causing  tissue lysis, bleaching, and drastic losses in coral reefs. It is considered to be one of the major pathogens due to its ability to cause major economic damage by infecting various aquatic organisms including oysters. *V. coralliilyticus* ATCC BAA-450 is the type-strain while RE22 specifically infects larval bivalve shellfish and causes high larval mortality in oyster hatcheries. Analysis of the genome of these two strains and determination of antimicrobial resistance genes present may shed light on the mechanism as to why these strains are difficult to eradicate in oyster aquacultures and aid in the choice of proper antimicrobials to be used as well as in probiotic development. This script encompasses various stages of data manipulation, statistical summaries, and visualizations, making extensive use of R libraries such as dplyr, ggplot2, and igraph. The analysis includes loading data, identifying common gene functions, examining gene structure, assessing gene orientations and locations, identifying antimicrobial resistance genes (ARG), and constructing a network of shared and unique ARGs.  The genome of the bacterial strains used in this project was downloaded from NCBI GenBank. Rapid Annotation using Subsystem Technology (RAST) was also used to annotate the bacterial genomes. These annotations include information such as gene functions, locations, and other metadata essential for downstream analysis. 
+
+```{r setup, include=FALSE}
+
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(igraph)
+
+######## Load csv files. These are the annotated data from RAST
+RE22 <- read.csv("~/BIO539/Final Project/190893.139 - Vibrio coralliilyticus RE22-.csv")
+BAA_450 <- read.csv("~/BIO539/Final Project/190893.140 - Vibrio coralliilyticus ATCC BAA-450.csv")
+```
+### Structural Genomics
+
+Structural genomic analysis is performed by calculating the size of each gene (difference between start and stop positions) and summarizing these sizes to obtain the mean, minimum, and maximum gene size. This provides a basic quantitative overview of the gene sizes within each strain's genome, potentially indicative of the complexity or evolutionary aspects of the genomic regions.
+
+```{r Structural Genomics, echo=FALSE, table.align='center'}
+#Calculate the size of each feature
+data_RE22 <- mutate(RE22, size = abs(stop - start))
+data_BAA_450 <- mutate(BAA_450, size = abs(stop - start))
+
+# Summary statistics
+summary_stats_RE22 <- data_RE22 %>%
+  summarise(mean_size = mean(size), min_size = min(size), max_size = max(size))
+
+summary_stats_BAA_450 <- data_BAA_450 %>%
+  summarise(mean_size = mean(size), min_size = min(size), max_size = max(size))
+
+# Summary Stats into table
+df <- data.frame(
+  Name = c("Mean Size", "Minimum Size", "Maximum Size"),
+  RE22 = c(973.8127, 73, 20552),
+  BAA450 = c(933.7458, 73, 17090)
+)
+
+# Display the table using kable
+kable(
+  df,
+  knitr.table.format = 'html',
+  align = c("l","c", "c"),  # Align columns left, center, and right
+  col.names = c("Name", "RE22", "ATCC BAA-450"),  # Rename columns
+  row.names = FALSE  # Hide row names
+)
+
+```
+
+**Table 1.** Overview of gene sizes within each strain’s genome. These calculations show that *V. corrallilyticus* RE22 genome has longer genes than the type-strain *V. corrallilyticus* ATCC BAA-450. Analysis of the annotated genes indicates that there is also repeat region present in RE22 (n = 5504 contigs) that is absent in ATCC BAA-450 (n = 5409 contigs). 
+
+### Gene Function Analysis
+
+This section identifies the most common gene functions within each strain. It first filters the data to focus on protein-encoding genes (PEGS), counts the occurrence of each gene function, and identifies the top 10 most prevalent functions using the “top_n” R studio function. This subset of data is then visualized using a bar plot, allowing for easy comparison between the two strains. Alternatively, the data can also be filtered using RNA as the focus instead of PEGS.
+
+```{r Gene Functions, echo=FALSE, message=FALSE, results='hide', warning=FALSE, fig.align='center'}
+######## Analyze the most common gene functions
+common_functions_RE22<- RE22 %>%
+  filter(type == "peg") %>%  # Filter for protein-encoding genes
+  count(function., sort = TRUE) %>%
+  top_n(10, n)  # Select the top 10 most common functions
+
+common_functions_BAA_450 <- BAA_450 %>%
+  filter(type == "peg") %>%  # Filter for protein-encoding genes
+  count(function., sort = TRUE) %>%
+  top_n(10, n)  # Select the top 10 most common functions
+
+# Combine the data frames
+combined_data <- rbind(mutate(common_functions_RE22, strain = "V. coralliilyticus RE22"),
+                       mutate(common_functions_BAA_450, strain = "V. coralliilyticus ATCC BAA-450"))
+
+# Create the ggplot
+ggplot(combined_data, aes(x = reorder(function., n), y = n)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 most common gene functions",
+       x = "Function", y = "Frequency") +
+  facet_wrap(~ strain, scales = "free", ncol = 1) +
+  theme(plot.title = element_text(hjust = 0.5),  # Center the title
+        plot.margin = margin(t = 1, r = 4, b = 1, l = 1, unit = "cm"),  # Adjust the plot margins
+        axis.text.y = element_text(size = 4))  # Set the size of the y-axis labels
+
+```
+
+**Figure 1.** Top 10 Most Common Gene Function. This displays the top 10 most common gene functions identified within the genomes of *V. coralliilyticus* strains RE22 and ATCC BAA-450 using the “top_n” functions in R studio. The y-axis represents the gene functions ordered by their frequency, and the x-axis shows the number of occurrences of each function. Both strains have relatively the same top 10 gene functions with an additional transcriptional regulator (unspecified) for *V. coralliilyticus* strains ATCC BAA-450.
+
+### Orientation and Location Analysis
+
+Orientation analysis counts the occurrences of genes on different strands (forward and reverse), combining the results into a single dataset for both strains. This combined data is visualized, showing the distribution of gene orientations. Additionally, the script plots the distribution of genes along contigs for each strain, providing insights into the genomic architecture and possibly the clustering of functionally related genes.
+
+```{r Orientation and Location Analysis, echo=FALSE, message=FALSE, results='hide', warning=FALSE, fig.align='center'}
+
+# Orientation analysis
+orientation_count <- RE22 %>%
+  count(strand)
+
+orientation_count2 <- BAA_450 %>%
+  count(strand)
+
+orientation_count_combined <- rbind(mutate(orientation_count, strain = "Vibrio coralliilyticus RE22"),
+                       mutate(orientation_count2, strain = "Vibrio coralliilyticus ATCC BAA-450"))
+
+# Create ggplot
+ggplot(orientation_count_combined, aes(x = strand, y = n)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Gene orientation distribution", x = "Strand", y = "Count") +
+  facet_wrap(~ strain, scales = "free", ncol = 1)
+```
+
+**Figure 2.** Gene Orientation Distribution illustrates the distribution of gene orientations for both forward and reverse strands in the genomes. The y-axis categorizes the strands while the x-axis counts the number of genes on each strand. It can be observed that *V. corallilyticus* RE22 (n (+) = 2808, n(-) = 2696) contains more genes in the positive strand than *V. corallilyticus*  ATCC BAA-450 (n (+) = 2422, n(-) = 2987).
+
+```{r Cluster Analysis, echo=FALSE, message=FALSE, results='hide', warning=FALSE, fig.align='center'}
+
+# Clustering of Genes along Contigs (simple visualization)
+RE22 %>%
+  ggplot(aes(x = start, y = as.factor(contig_id), color = strand)) +
+  geom_point() +
+  labs(title = "Gene distribution along contigs - Vibrio coralliilyticus RE22", x = "Start position", y = "Contig")
+
+BAA_450 %>%
+  ggplot(aes(x = start, y = as.factor(contig_id), color = strand)) +
+  geom_point() +
+  labs(title = "Gene distribution along contigs - Vibrio coralliilyticus ATCC BAA-450", x = "Start position", y = "Contig")
+
+```
+
+**Figure 3.** Gene Distribution Along Contigs. The plots show the distribution of genes along the contigs for *V. coralliilyticus* RE22 and ATCC BAA-450. The x-axis represents the start position of genes along the genome while the y-axis corresponds to the contig ID. Points are colored based on the strand, providing insights into the spatial gene distribution and potential clustering within the genome. RE22 genes were distributed in just 3 DNA contigs while ATCC BAA-450 genes were distributed to several contigs. Compactness might imply a more streamlined set of genetic functions or a recent evolutionary consolidation of essential genes while the distribution pattern to several contigs might reflect different histories of horizontal gene transfer, among others.
+
+### Antimicrobial Resistance Genes (ARG)
+
+This part focuses in identifying and analyzing antimicrobial resistance genes present in one or both strain. Using keyword search, the script filters for genes related to resistance. The identified genes are then combined into a single dataset, and the results were saved for further analysis. Additionally, a presence-absence matrix is constructed for all genes across the two strains, highlighting which genes are common and which are unique to each strain.
+
+```{r Antimicrobial Resistance Genes (ARG), echo=FALSE, message=FALSE, results='hide', warning=FALSE, fig.align='center'}
+# Load csv files containing annotations from RAST
+RE22_annotations <- read.csv("~/BIO539/Final Project/190893.139 - Vibrio coralliilyticus RE22-.csv")
+BAA_450_annotations <- read.csv("~/BIO539/Final Project/190893.140 - Vibrio coralliilyticus ATCC BAA-450.csv")
+
+# Filter data based on a simple keyword search for "resistance" (resistance genes)
+RE22_resistance_genes <- subset(RE22_annotations, grepl("resistance", function. , ignore.case = TRUE))
+BAA_450_resistance_genes <- subset(BAA_450_annotations, grepl("resistance", function. , ignore.case = TRUE))
+
+# Identify the common and unique resistance genes.
+common_genes <- intersect(RE22_resistance_genes$function., BAA_450_resistance_genes$function.)
+unique_RE22 <- setdiff(RE22_resistance_genes$function., BAA_450_resistance_genes$function.)
+unique_BAA_450 <- setdiff(BAA_450_resistance_genes$function., RE22_resistance_genes$function.)
+
+# Combine the data frames
+combined__resistance_data <- rbind(mutate(RE22_resistance_genes, strain = "Vibrio coralliilyticus RE22"),
+                       mutate(BAA_450_resistance_genes, strain = "Vibrio coralliilyticus ATCC BAA-450")) %>% 
+  select(contig_id, feature_id, location, start, stop, strand, function., nucleotide_sequence, aa_sequence, strain)
+
+#Save output as csv File
+write.csv(combined__resistance_data, "~/BIO539/Final Project/combined__resistance_data.csv")
+
+# Output results
+list_of_genes <- list(common = common_genes, uniqueToRE22 = unique_RE22, uniqueToBAA_450 = unique_BAA_450)
+
+all_genes <- unique(c(RE22_annotations$function., BAA_450_annotations$function.))
+
+# Create a matrix showing presence (1) or absence (0)
+presence_absence_matrix <- data.frame(
+  Gene = all_genes,
+  RE22 = as.integer(all_genes %in% RE22_annotations$function.),
+  BAA_450 = as.integer(all_genes %in% BAA_450_annotations$function.)
+)
+
+# Genes present in both strains
+common_genes <- presence_absence_matrix$Gene[presence_absence_matrix$RE22 == 1 & presence_absence_matrix$BAA_450 == 1]
+
+# Genes unique to each strain
+unique_RE22 <- presence_absence_matrix$Gene[presence_absence_matrix$RE22 == 1 & presence_absence_matrix$BAA_450 == 0]
+unique_BAA_450 <- presence_absence_matrix$Gene[presence_absence_matrix$RE22 == 0 & presence_absence_matrix$BAA_450 == 1]
+
+# save output as csv file
+write.csv(presence_absence_matrix, "~/BIO539/Final Project/presence_absence_matrix.csv")
+
+# Number of unique and common genes
+data <- data.frame(
+  Category = c("Unique to RE22", "Unique to BAA_450"),
+  Count = c(length(unique_RE22), length(unique_BAA_450))
+)
+
+# Bar plot
+ggplot(data, aes(x = Category, y = Count)) +
+  geom_bar(stat = "identity") 
+  theme_minimal() +
+  labs(title = "Comparison of ARGs between Two Bacterial Strains", x = "Strain", y = "Number of Genes")
+
+```
+
+**Figure 4.** Comparison of unique genes between two bacterial strains shows that BAA-450 (n = 111) has more unique genes compared to RE22 (n = 87). Common genes (not shown, n = 3215) shared by both strains are still higher in number compared to the unique features. A presence and absence matrix (present = 1, absent = 0) focusing on resistance genes was also performed, however, analysis show that both strains shared the same set of resistance genes (based on the keyword search “resistance” for gene function).
+
+### Network Analysis
+
+Network of ARGs unique to each strains represents the relationships and connections of unique antimicrobial resistance genes (ARGs) to each strain, with RE22 and BAA-450 at the center of their respective gene sets. Nodes represent individual genes, while edges show the association of each gene with its strain. The network provides insights into how ARGs are distributed between the strains, potentially reflecting evolutionary divergences or differences in resistance mechanisms.
+
+```{r Network of Antimicrobial Resistance Genes (ARG), echo=FALSE, message=FALSE, results='hide', warning=FALSE, fig.align='center'}
+######Presence and absent matrix specific to ARGs
+presence_absence_matrix_ARGs <- subset(presence_absence_matrix, grepl("resistance", Gene, ignore.case = TRUE))
+
+# Genes present in both strains
+common_genes_arg <- presence_absence_matrix_ARGs$Gene[presence_absence_matrix_ARGs$RE22 == 1 & presence_absence_matrix_ARGs$BAA_450 == 1]
+
+# Genes unique to each strain
+unique_RE22_arg <- presence_absence_matrix_ARGs$Gene[presence_absence_matrix_ARGs$RE22 == 1 & presence_absence_matrix_ARGs$BAA_450 == 0]
+unique_BAA_450_arg <- presence_absence_matrix_ARGs$Gene[presence_absence_matrix_ARGs$RE22 == 0 & presence_absence_matrix_ARGs$BAA_450 == 1]
+
+
+# Number of unique and common ARGs
+data_arg <- data.frame(
+  Category = c("Common Genes", "Unique to RE22", "Unique to BAA_450"),
+  Count = c(length(common_genes_arg), length(unique_RE22_arg), length(unique_BAA_450_arg))
+)
+
+# Bar plot
+#ggplot(data_arg, aes(x = Category, y = Count)) +
+#  geom_bar(stat = "identity") 
+#  theme_minimal() +
+#  labs(title = "Comparison of ARGs between Two Bacterial Strains", x = "Strain", y = "Number of Genes")
+
+# Create edges and nodes for the graph based on gene presence
+edges <- data.frame(
+  from = c(rep("RE22", length(unique_RE22_arg)), rep("BAA_450", length(unique_BAA_450_arg))),
+  to = c(unique_RE22_arg, unique_BAA_450_arg)
+)
+
+
+# Add common genes connections
+edges <- rbind(edges, data.frame(from = "RE22", to = common_genes_arg))
+edges <- rbind(edges, data.frame(from = "BAA_450", to = common_genes_arg))
+
+# Create graph
+graph <- graph_from_data_frame(edges, directed = FALSE)
+
+# Plot
+plot(graph, vertex.size = 10, vertex.label.cex = 0.5, edge.arrow.size = 5, main = "Network of ARGs Shared and Unique to Strains")
+
+```
+
+**Figure 5**. Network analysis shows that both RE22 and ATCC BAA-450 shared the same set of resistance genes based on the parameters set for this analysis. Twenty (20) resistance genes were identified.
+
+
+### Conclusion
+Overall, results of genome analysis suggest that both strains share relatively the same characteristics in terms of structure, size, and the presence of antimicrobial resistant genes. However, further in-depth analysis of gene distribution as well as detection of other ARGs using different methods or software/ R packages should be performed.  
+
+
